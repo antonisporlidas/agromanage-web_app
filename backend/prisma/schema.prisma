@@ -1,0 +1,131 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  FARMER
+  ADMIN
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ExpenseCategory {
+  FERTILIZER
+  PESTICIDE
+  FUEL
+  LABOR
+  EQUIPMENT
+  OTHER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(FARMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fields    Field[]
+}
+
+model Field {
+  id          String   @id @default(uuid())
+  name        String
+  areaInStremma Float  // Έκταση σε στρέμματα
+  location    String?  // Τοποθεσία ή συντεταγμένες σε GeoJSON/String
+  soilType    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cropCycles  CropCycle[]
+}
+
+model CropCycle {
+  id          String    @id @default(uuid())
+  cropType    String    // π.χ. Ελιά, Βαμβάκι, Σιτάρι
+  variety     String?   // Ποικιλία
+  startDate   DateTime
+  endDate     DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  fieldId     String
+  field       Field     @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  tasks       Task[]
+  expenses    Expense[]
+  dispatches  DispatchNote[]
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  cropCycleId String
+  cropCycle   CropCycle  @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id          String          @id @default(uuid())
+  title       String
+  amount      Float
+  category    ExpenseCategory @default(OTHER)
+  date        DateTime        @default(now())
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  cropCycleId String
+  cropCycle   CropCycle       @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+}
+
+model DispatchNote {
+  id             String      @id @default(uuid())
+  dispatchNumber String
+  recipient      String      // π.χ. Συνεταιρισμός / Έμπορος
+  quantityKg     Float       // Παραδοθείσα ποσότητα σε kg
+  deliveryDate   DateTime    @default(now())
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  cropCycleId    String
+  cropCycle      CropCycle   @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+
+  settlement     Settlement?
+}
+
+model Settlement {
+  id             String       @id @default(uuid())
+  pricePerKg     Float        // Τιμή ανά κιλό
+  totalAmount    Float        // Συνολικό ποσό εκκαθάρισης
+  settledAt      DateTime     @default(now())
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  dispatchNoteId String       @unique
+  dispatchNote   DispatchNote @relation(fields: [dispatchNoteId], references: [id], onDelete: Cascade)
+}
