@@ -20,12 +20,26 @@ enum TaskStatus {
 }
 
 enum ExpenseCategory {
+  SEEDS
   FERTILIZER
   PESTICIDE
   FUEL
   LABOR
   EQUIPMENT
   OTHER
+}
+
+enum TaskType {
+  PLANTING      // Φύτευση / Σπορά
+  FERTILIZATION // Λίπανση
+  SPRAYING      // Ψεκασμός
+  HARVEST       // Συγκομιδή
+  SHREDDING     // Καταστροφέας
+}
+
+enum HarvestQualityGrade {
+  GRADE_A       // Κατηγορία Α
+  GRADE_B       // Κατηγορία Β
 }
 
 model User {
@@ -38,30 +52,33 @@ model User {
   updatedAt DateTime @updatedAt
 
   fields    Field[]
+  expenses  Expense[]
 }
 
 model Field {
-  id          String   @id @default(uuid())
-  name        String
-  areaInStremma Float  // Έκταση σε στρέμματα
-  location    String?  // Τοποθεσία ή συντεταγμένες σε GeoJSON/String
-  soilType    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  areaInStremma Float    // Έκταση σε στρέμματα
+  location      String?  // Τοποθεσία ή συντεταγμένες
+  soilType      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  cropCycles  CropCycle[]
+  cropCycles    CropCycle[]
+  expenses      Expense[]
 }
 
 model CropCycle {
   id          String    @id @default(uuid())
   cropType    String    // π.χ. Ελιά, Βαμβάκι, Σιτάρι
   variety     String?   // Ποικιλία
+  year        Int       @default(2026) // Έτος σεζόν
   startDate   DateTime
   endDate     DateTime?
-  isActive    Boolean   @default(true)
+  isActive    Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -73,18 +90,35 @@ model CropCycle {
   dispatches  DispatchNote[]
 }
 
-model Task {
-  id          String     @id @default(uuid())
-  title       String
-  description String?
-  status      TaskStatus @default(PENDING)
-  dueDate     DateTime?
-  completedAt DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
 
-  cropCycleId String
-  cropCycle   CropCycle  @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+
+model Task {
+  id                String               @id @default(uuid())
+  taskType          TaskType             // Ο τύπος της εργασίας
+  title             String?              // Προαιρετικός σύντομος τίτλος/περιγραφή
+  status            TaskStatus           @default(PENDING)
+  dueDate           DateTime?
+  completedAt       DateTime?
+  notes             String?
+
+  // Συσχέτιση με Δελτίο Αποστολής (Batch Tracking)
+  dispatchNoteId    String?
+  dispatchNote      DispatchNote?        @relation(fields: [dispatchNoteId], references: [id], onDelete: SetNull)
+
+  // Πεδία για Ψεκασμό / Λίπανση
+  productName       String?              // π.χ. "NPK 20-20-20" ή "Decis Trap"
+  quantityApplied   Float?               // π.χ. 25.5
+  dosageUnit        String?              // π.χ. "kg", "λίτρα", "cc/στρέμμα"
+
+  // Πεδία για Συγκομιδή
+  harvestQuantityKg Float?               // Ποσότητα σε κιλά (kg)
+  qualityGrade      HarvestQualityGrade? // GRADE_A ή GRADE_B
+
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  cropCycleId       String
+  cropCycle         CropCycle            @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
 }
 
 model Expense {
@@ -97,24 +131,33 @@ model Expense {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  cropCycleId String
-  cropCycle   CropCycle       @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+  // Συσχέτιση με Χρήστη (Υποχρεωτική)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Προαιρετικές συσχετίσεις (για ευελιξία στην καταχώρηση)
+  fieldId     String?
+  field       Field?          @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+
+  cropCycleId String?
+  cropCycle   CropCycle?      @relation(fields: [cropCycleId], references: [id], onDelete: SetNull)
 }
 
 model DispatchNote {
-  id             String      @id @default(uuid())
+  id             String       @id @default(uuid())
   dispatchNumber String
-  recipient      String      // π.χ. Συνεταιρισμός / Έμπορος
-  quantityKg     Float       // Παραδοθείσα ποσότητα σε kg
-  deliveryDate   DateTime    @default(now())
+  recipient      String       // π.χ. Συνεταιρισμός / Έμπορος
+  quantityKg     Float        // Ποσότητα σε kg
+  deliveryDate   DateTime     @default(now())
   notes          String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   cropCycleId    String
-  cropCycle      CropCycle   @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+  cropCycle      CropCycle    @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
 
   settlement     Settlement?
+  harvestTasks Task[]
 }
 
 model Settlement {
