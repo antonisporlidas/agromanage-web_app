@@ -43,54 +43,67 @@ enum HarvestQualityGrade {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String    @id @default(uuid())
+  email     String    @unique
   password  String
   name      String
-  role      Role     @default(FARMER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role      Role      @default(FARMER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   fields    Field[]
   expenses  Expense[]
+  customers Customer[]
+}
+model Customer {
+  id            String         @id @default(uuid())
+  name          String         // π.χ. "Αγροτικός Συνεταιρισμός", "Έμπορος Παπαδόπουλος"
+  phone         String?
+  vatNumber     String?        // ΑΦΜ (προαιρετικά)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dispatches    DispatchNote[]
 }
 
 model Field {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   name          String
-  areaInStremma Float    // Έκταση σε στρέμματα
-  location      String?  // Τοποθεσία ή συντεταγμένες
+  areaInStremma Float       // Έκταση σε στρέμματα
+  location      String?     // Τοποθεσία ή συντεταγμένες
   soilType      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   cropCycles    CropCycle[]
   expenses      Expense[]
 }
 
 model CropCycle {
-  id          String    @id @default(uuid())
-  cropType    String    // π.χ. Ελιά, Βαμβάκι, Σιτάρι
-  variety     String?   // Ποικιλία
-  year        Int       @default(2026) // Έτος σεζόν
+  id          String         @id @default(uuid())
+  cropType    String         // π.χ. Ελιά, Βαμβάκι, Σιτάρι
+  variety     String?        // Ποικιλία
+  year        Int            @default(2026) // Έτος σεζόν
   startDate   DateTime
   endDate     DateTime?
-  isActive    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   fieldId     String
-  field       Field     @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  field       Field          @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
   tasks       Task[]
   expenses    Expense[]
   dispatches  DispatchNote[]
 }
-
-
 
 model Task {
   id                String               @id @default(uuid())
@@ -146,7 +159,6 @@ model Expense {
 model DispatchNote {
   id             String       @id @default(uuid())
   dispatchNumber String
-  recipient      String       // π.χ. Συνεταιρισμός / Έμπορος
   quantityKg     Float        // Ποσότητα σε kg
   deliveryDate   DateTime     @default(now())
   notes          String?
@@ -155,20 +167,35 @@ model DispatchNote {
 
   cropCycleId    String
   cropCycle      CropCycle    @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   settlement     Settlement?
-  harvestTasks Task[]
+  harvestTasks   Task[]
 }
 
 model Settlement {
-  id             String       @id @default(uuid())
-  pricePerKg     Float        // Τιμή ανά κιλό
-  totalAmount    Float        // Συνολικό ποσό εκκαθάρισης
-  settledAt      DateTime     @default(now())
+  id             String           @id @default(uuid())
+  totalAmount    Float            // Συνολικό ποσό εκκαθάρισης (άθροισμα όλων των γραμμών)
+  totalQuantityKg Float           // Συνολικά κιλά που τιμολογήθηκαν
+  settledAt      DateTime         @default(now())
   notes          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  dispatchNoteId String       @unique
-  dispatchNote   DispatchNote @relation(fields: [dispatchNoteId], references: [id], onDelete: Cascade)
+  dispatchNoteId String           @unique
+  dispatchNote   DispatchNote     @relation(fields: [dispatchNoteId], references: [id], onDelete: Cascade)
+
+  items          SettlementItem[]
+}
+
+model SettlementItem {
+  id           String      @id @default(uuid())
+  grade        String?     // π.χ. "Κατηγορία Α", "Διαλογή", "Βιομηχανική"
+  quantityKg   Float       // Κιλά για τη συγκεκριμένη τιμή (π.χ. 80 kg)
+  pricePerKg   Float       // Τιμή ανά κιλό (π.χ. 1.00 €)
+  subtotal     Float       // quantityKg * pricePerKg (π.χ. 80.00 €)
+
+  settlementId String
+  settlement   Settlement  @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 }

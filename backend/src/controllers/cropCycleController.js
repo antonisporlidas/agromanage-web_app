@@ -19,16 +19,16 @@ export const createCropCycle = async (req, res) => {
     }
 
     const newCropCycle = await prisma.cropCycle.create({
-      data: {
-        fieldId,
-        cropType,
-        variety,
-        year: year ? parseInt(year) : new Date(startDate).getFullYear(),
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
-        isActive: isActive !== undefined ? isActive : true
-      }
-    });
+  data: {
+    fieldId,
+    cropType,
+    variety,
+    year: year ? parseInt(year) : new Date(startDate).getFullYear(),
+    startDate: new Date(startDate),
+    endDate: endDate ? new Date(endDate) : null,
+    isActive: isActive !== undefined ? isActive : false // Πάντα false από προεπιλογή
+  }
+});
 
     res.status(201).json({
       message: 'Ο καλλιεργητικός κύκλος δημιουργήθηκε επιτυχώς!',

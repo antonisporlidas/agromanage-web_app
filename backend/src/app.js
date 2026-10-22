@@ -4,6 +4,8 @@ import authRoutes from './routes/authRoutes.js';
 import fieldRoutes from './routes/fieldRoutes.js';
 import cropCycleRoutes from './routes/cropCycleRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
+import customerRoutes from './routes/customerRoutes.js';
+import dispatchRoutes from './routes/dispatchRoutes.js';
 const app = express();
 
 app.use(cors());
@@ -19,5 +21,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/fields', fieldRoutes);
 app.use('/api/crop-cycles', cropCycleRoutes);
 app.use('/api/tasks', taskRoutes);
-
+app.use('/api/customers', customerRoutes);
+app.use('/api/dispatches', dispatchRoutes);
 export default app;
