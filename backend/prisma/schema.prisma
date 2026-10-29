@@ -20,13 +20,14 @@ enum TaskStatus {
 }
 
 enum ExpenseCategory {
-  SEEDS
-  FERTILIZER
-  PESTICIDE
-  FUEL
-  LABOR
-  EQUIPMENT
-  OTHER
+  SEEDS_PLANTS     // Σπόροι / Φυτά
+  FERTILIZERS      // Λιπάσματα
+  PESTICIDES       // Φυτοφάρμακα
+  LABOR            // Εργατικά / Ημερομίσθια
+  FUEL             // Καύσιμα / Πετρέλαιο
+  IRRIGATION       // Άρδευση / Ρεύμα / Νερό
+  EQUIPMENT        // Συντήρηση εξοπλισμού / Μηχανήματα
+  OTHER            // Λοιπά έξοδα
 }
 
 enum TaskType {
@@ -103,6 +104,7 @@ model CropCycle {
   tasks       Task[]
   expenses    Expense[]
   dispatches  DispatchNote[]
+  settlementItems SettlementItem[]
 }
 
 model Task {
@@ -140,6 +142,7 @@ model Expense {
   amount      Float
   category    ExpenseCategory @default(OTHER)
   date        DateTime        @default(now())
+  year        Int?
   notes       String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -156,46 +159,60 @@ model Expense {
   cropCycle   CropCycle?      @relation(fields: [cropCycleId], references: [id], onDelete: SetNull)
 }
 
+enum DispatchStatus {
+  PENDING             // Καμία εκκαθάριση
+  PARTIALLY_SETTLED   // Μερική εκκαθάριση
+  SETTLED             // Πλήρης εξόφληση/εκκαθάριση
+}
+
 model DispatchNote {
-  id             String       @id @default(uuid())
+  id             String          @id @default(uuid())
   dispatchNumber String
-  quantityKg     Float        // Ποσότητα σε kg
-  deliveryDate   DateTime     @default(now())
+  quantityKg     Float           // Συνολικά κιλά δελτίου
+  status         DispatchStatus  @default(PENDING)
+  deliveryDate   DateTime        @default(now())
   notes          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  cropCycleId    String
-  cropCycle      CropCycle    @relation(fields: [cropCycleId], references: [id], onDelete: Cascade)
-  customerId  String
-  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerId     String
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
-  settlement     Settlement?
+  cropCycleId    String?
+  cropCycle      CropCycle?      @relation(fields: [cropCycleId], references: [id], onDelete: SetNull)
+
+  // Αλλαγή από Settlement? σε Settlement[] (Σχέση 1 προς Πολλά)
+  settlements    Settlement[]
   harvestTasks   Task[]
 }
 
 model Settlement {
-  id             String           @id @default(uuid())
-  totalAmount    Float            // Συνολικό ποσό εκκαθάρισης (άθροισμα όλων των γραμμών)
-  totalQuantityKg Float           // Συνολικά κιλά που τιμολογήθηκαν
-  settledAt      DateTime         @default(now())
-  notes          String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id              String           @id @default(uuid())
+  totalAmount     Float            @default(0.0)
+  totalQuantityKg Float            @default(0.0)
+  settledAt       DateTime         @default(now())
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  dispatchNoteId String           @unique
-  dispatchNote   DispatchNote     @relation(fields: [dispatchNoteId], references: [id], onDelete: Cascade)
+  dispatchNoteId  String
+  // Αφαιρέθηκε το @unique από το dispatchNoteId για να επιτρέπονται πολλαπλές εκκαθαρίσεις
+  dispatchNote    DispatchNote     @relation(fields: [dispatchNoteId], references: [id], onDelete: Cascade)
 
-  items          SettlementItem[]
+  items           SettlementItem[]
 }
 
 model SettlementItem {
   id           String      @id @default(uuid())
-  grade        String?     // π.χ. "Κατηγορία Α", "Διαλογή", "Βιομηχανική"
-  quantityKg   Float       // Κιλά για τη συγκεκριμένη τιμή (π.χ. 80 kg)
+  grade        String?     // π.χ. "Α Διαλογή", "Βιομηχανική"
+  quantityKg   Float       // Κιλά (π.χ. 30 kg)
   pricePerKg   Float       // Τιμή ανά κιλό (π.χ. 1.00 €)
-  subtotal     Float       // quantityKg * pricePerKg (π.χ. 80.00 €)
+  subtotal     Float       // quantityKg * pricePerKg
 
   settlementId String
   settlement   Settlement  @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  // Βάλε ? για να είναι nullable και να περάσει άμεσα
+  cropCycleId  String?
+  cropCycle    CropCycle?  @relation(fields: [cropCycleId], references: [id], onDelete: Restrict)
 }

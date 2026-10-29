@@ -114,9 +114,9 @@ export const createDispatchNote = async (req, res) => {
       harvestTaskIds
     } = req.body;
 
-    if (!cropCycleId || !customerId || !dispatchNumber || !harvestTaskIds || !Array.isArray(harvestTaskIds) || harvestTaskIds.length === 0) {
+    if (!customerId || !dispatchNumber || !harvestTaskIds || !Array.isArray(harvestTaskIds) || harvestTaskIds.length === 0) {
       return res.status(400).json({
-        error: 'Απαιτούνται cropCycleId, customerId, dispatchNumber και τουλάχιστον ένα επιλεγμένο task συγκομιδής.'
+        error: 'Απαιτούνται customerId, dispatchNumber και τουλάχιστον ένα επιλεγμένο task συγκομιδής.'
       });
     }
 

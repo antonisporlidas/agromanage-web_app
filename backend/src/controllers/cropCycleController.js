@@ -113,70 +113,97 @@ export const getCropCycleById = async (req, res) => {
   }
 };
 
-// 4. Ενημέρωση καλλιεργητικού κύκλου
-export const updateCropCycle = async (req, res) => {
-  try {
-    const userId = req.user.userId || req.user.id;
-    const { id } = req.params;
-    const { cropType, variety, year, startDate, endDate, isActive } = req.body;
-
-    const existingCycle = await prisma.cropCycle.findFirst({
-      where: {
-        id,
-        field: { userId }
-      }
-    });
-
-    if (!existingCycle) {
-      return res.status(404).json({ error: 'Ο καλλιεργητικός κύκλος δεν βρέθηκε.' });
-    }
-
-    const updatedCycle = await prisma.cropCycle.update({
-      where: { id },
-      data: {
-        cropType: cropType ?? existingCycle.cropType,
-        variety: variety ?? existingCycle.variety,
-        year: year ? parseInt(year) : existingCycle.year,
-        startDate: startDate ? new Date(startDate) : existingCycle.startDate,
-        endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : existingCycle.endDate,
-        isActive: isActive !== undefined ? isActive : existingCycle.isActive
-      }
-    });
-
-    res.status(200).json({
-      message: 'Ο καλλιεργητικός κύκλος ενημερώθηκε επιτυχώς!',
-      cropCycle: updatedCycle
-    });
-  } catch (error) {
-    console.error('Σφάλμα στην ενημέρωση καλλιεργητικού κύκλου:', error);
-    res.status(500).json({ error: 'Κάτι πήγε στραβά στο server.' });
-  }
-};
-
-// 5. Διαγραφή καλλιεργητικού κύκλου
+// Διαγραφή Καλλιέργειας
 export const deleteCropCycle = async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { id } = req.params;
 
-    const existingCycle = await prisma.cropCycle.findFirst({
+    const cropCycle = await prisma.cropCycle.findFirst({
       where: {
         id,
         field: { userId }
+      },
+      include: {
+        settlementItems: true,
+        tasks: {
+          where: { dispatchNoteId: { not: null } }
+        }
       }
     });
 
-    if (!existingCycle) {
-      return res.status(404).json({ error: 'Ο καλλιεργητικός κύκλος δεν βρέθηκε.' });
+    if (!cropCycle) {
+      return res.status(404).json({ error: 'Η καλλιέργεια δεν βρέθηκε.' });
     }
 
-    await prisma.cropCycle.delete({
-      where: { id }
+    // Έλεγχος αν υπάρχουν εκκαθαρίσεις
+    if (cropCycle.settlementItems.length > 0) {
+      return res.status(400).json({
+        error: 'Αδύνατη η διαγραφή: Η καλλιέργεια έχει ήδη τιμολογηθεί σε εκκαθαρίσεις.'
+      });
+    }
+
+    // Έλεγχος αν υπάρχουν δελτία αποστολής
+    if (cropCycle.tasks.length > 0) {
+      return res.status(400).json({
+        error: 'Αδύνατη η διαγραφή: Η σοδειά της καλλιέργειας έχει ήδη φορτωθεί σε δελτία αποστολής.'
+      });
+    }
+
+    await prisma.cropCycle.delete({ where: { id } });
+
+    res.status(200).json({ message: 'Η καλλιέργεια διαγράφηκε επιτυχώς.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Σφάλμα κατά τη διαγραφή.' });
+  }
+};
+
+// Επεξεργασία Καλλιέργειας (Κλείδωμα βασικών στοιχείων αν έχει γίνει εκκαθάριση)
+export const updateCropCycle = async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const { id } = req.params;
+    const { cropType, variety, fieldId, notes, isActive, endDate } = req.body;
+
+    const cropCycle = await prisma.cropCycle.findFirst({
+      where: { id, field: { userId } },
+      include: { settlementItems: true }
     });
 
-    res.status(200).json({ message: 'Ο καλλιεργητικός κύκλος διαγράφηκε επιτυχώς.' });
+    if (!cropCycle) {
+      return res.status(404).json({ error: 'Η καλλιέργεια δεν βρέθηκε.' });
+    }
+
+    const hasSettlements = cropCycle.settlementItems.length > 0;
+
+    // Αν έχει γίνει εκκαθάριση, απαγορεύεται η αλλαγή του είδους, της ποικιλίας και του χωραφιού
+    if (hasSettlements) {
+      if ((cropType && cropType !== cropCycle.cropType) || 
+          (variety && variety !== cropCycle.variety) || 
+          (fieldId && fieldId !== cropCycle.fieldId)) {
+        return res.status(400).json({
+          error: 'Δεν μπορείτε να αλλάξετε είδος, ποικιλία ή χωράφι σε καλλιέργεια που έχει εκκαθαριστεί.'
+        });
+      }
+    }
+
+    const updated = await prisma.cropCycle.update({
+      where: { id },
+      data: {
+        cropType: hasSettlements ? undefined : cropType,
+        variety: hasSettlements ? undefined : variety,
+        fieldId: hasSettlements ? undefined : fieldId,
+        notes,
+        isActive,
+        endDate: endDate ? new Date(endDate) : undefined
+      }
+    });
+
+    res.status(200).json({
+      message: 'Η καλλιέργεια ενημερώθηκε επιτυχώς.',
+      cropCycle: updated
+    });
   } catch (error) {
-    console.error('Σφάλμα στη διαγραφή κύκλου:', error);
-    res.status(500).json({ error: 'Κάτι πήγε στραβά στο server.' });
+    res.status(500).json({ error: error.message || 'Σφάλμα κατά την ενημέρωση.' });
   }
 };
