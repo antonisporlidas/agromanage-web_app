@@ -77,6 +77,8 @@ model Field {
   areaInStremma Float       // Έκταση σε στρέμματα
   location      String?     // Τοποθεσία ή συντεταγμένες
   soilType      String?
+  latitude      Float?      // π.χ. 40.4833 (Γεωγραφικό πλάτος)
+  longitude     Float?      // π.χ. 23.1333 (Γεωγραφικό μήκος)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
